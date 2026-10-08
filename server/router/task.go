@@ -71,8 +71,36 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 	util.Res{Success: true, Message: "创建成功"}.Write(w)
 }
 
+func retryTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		util.Res{Success: false, Message: "不支持的请求方法"}.Write(w)
+		return
+	}
+	var body struct {
+		ID int `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ID <= 0 {
+		util.Res{Success: false, Message: "任务编号无效"}.Write(w)
+		return
+	}
+	db := util.MustGetDB()
+	defer db.Close()
+	status, err := task.RetryTask(db, body.ID)
+	if err != nil {
+		util.Res{Success: false, Message: err.Error()}.Write(w)
+		return
+	}
+	util.Res{Success: true, Message: "任务已接续", Data: status}.Write(w)
+}
+
 func getActiveTask(w http.ResponseWriter, r *http.Request) {
-	util.Res{Success: true, Data: task.GlobalTaskList}.Write(w)
+	task.GlobalTaskMux.Lock()
+	snapshot := make([]task.Task, len(task.GlobalTaskList))
+	for i, item := range task.GlobalTaskList {
+		snapshot[i] = *item
+	}
+	task.GlobalTaskMux.Unlock()
+	util.Res{Success: true, Data: snapshot}.Write(w)
 }
 
 func getTaskList(w http.ResponseWriter, r *http.Request) {

@@ -1,12 +1,12 @@
 import van, { State } from 'vanjs-core'
 import { Route, goto, now } from 'vanjs-router'
 import { checkLogin, GLOBAL_HAS_LOGIN, GLOBAL_HIDE_PAGE, ResJSON, VanComponent } from '../mixin'
-import { deleteTask, getActiveTask, getTaskList, showFile } from './data'
+import { deleteTask, getActiveTask, getTaskList, retryTask, showFile } from './data'
 import { TaskInDB, TaskStatus } from '../work/type'
 import { LoadingBox } from '../view'
 import { PlayerModalComp } from './playerModal'
 
-const { div, span } = van.tags
+const { button, div, span } = van.tags
 
 const { svg, path } = van.tags('http://www.w3.org/2000/svg')
 
@@ -30,7 +30,11 @@ export class TaskRoute implements VanComponent {
         opening: State<boolean>
         /** 是否正在删除 */
         deleting: State<boolean>
+        /** 是否正在发起接力下载 */
+        retrying: State<boolean>
     })[]> = van.state([])
+
+    restartPolling: () => void = () => {}
 
     constructor() {
 
@@ -83,7 +87,7 @@ export class TaskRoute implements VanComponent {
                                     div({ class: 'text-secondary small' },
                                         () => {
                                             if (task.statusState.val == 'waiting') return '等待下载'
-                                            if (task.statusState.val == 'error') return '下载失败 · 可重新解析后再试'
+                                            if (task.statusState.val == 'error') return '下载中断或失败 · 可从这里接力下载'
                                             if (task.statusState.val == 'done') return `已完成 · ${task.folder}`
                                             if (task.downloadType === 'audio_mp3' && task.audioProgress.val >= 1) return '正在转换 MP3'
                                             if (task.videoProgress.val == 0) {
@@ -122,20 +126,26 @@ export class TaskRoute implements VanComponent {
                                     class: 'me-3',
                                     hidden: () => task.statusState.val != 'error' || task.deleting.val,
                                 },
-                                    div({
+                                    button({
                                         class: 'btn btn-sm btn-outline-primary text-nowrap',
-                                        role: 'button',
-                                        tabIndex: 0,
-                                        onclick() {
-                                            window.location.hash = `#/work/bv/${encodeURIComponent(task.bvid)}`
-                                        },
-                                        onkeydown(event: KeyboardEvent) {
-                                            if (event.key === 'Enter' || event.key === ' ') {
-                                                event.preventDefault()
-                                                window.location.hash = `#/work/bv/${encodeURIComponent(task.bvid)}`
+                                        type: 'button',
+                                        disabled: task.retrying,
+                                        async onclick() {
+                                            task.retrying.val = true
+                                            try {
+                                                const status = await retryTask(task.id)
+                                                task.statusState.val = status
+                                                task.audioProgress.val = 0
+                                                task.videoProgress.val = 0
+                                                task.mergeProgress.val = 0
+                                                _that.restartPolling()
+                                            } catch (error) {
+                                                alert(`接力下载失败：${error instanceof Error ? error.message : String(error)}`)
+                                            } finally {
+                                                task.retrying.val = false
                                             }
                                         }
-                                    }, '重新解析')
+                                    }, () => task.retrying.val ? '正在准备…' : '接力下载')
                                 ),
                                 div({
                                     class: 'me-4',
@@ -193,12 +203,13 @@ export class TaskRoute implements VanComponent {
                     if (!taskList) return
                     _that.taskList.val = taskList.map(task => ({
                         ...task,
-                        audioProgress: van.state(1),
-                        videoProgress: van.state(1),
-                        mergeProgress: van.state(1),
+                        audioProgress: van.state(task.status == 'done' ? 1 : 0),
+                        videoProgress: van.state(task.status == 'done' ? 1 : 0),
+                        mergeProgress: van.state(task.status == 'done' ? 1 : 0),
                         statusState: van.state(task.status),
                         opening: van.state(false),
-                        deleting: van.state(false)
+                        deleting: van.state(false),
+                        retrying: van.state(false)
                     }))
 
                     const refresh = async () => {
@@ -218,24 +229,28 @@ export class TaskRoute implements VanComponent {
                                 }
                             })
                         })
-                        if (activeTaskList.filter(task => task.status == 'running').length == 0) {
+                        if (activeTaskList.filter(task => task.status == 'running' || task.status == 'waiting').length == 0) {
                             clearInterval(timer)
                             clearInterval(helper)
                         }
                         return true
                     }
 
-                    refresh()
-
-                    let timer = setInterval(() => {
+                    let timer: ReturnType<typeof setInterval>
+                    let helper: ReturnType<typeof setInterval>
+                    _that.restartPolling = () => {
+                        clearInterval(timer)
+                        clearInterval(helper)
                         refresh()
-                    }, 1000)
-                    let helper = setInterval(() => {
-                        if (now.val.split('/')[0] != 'task') {
-                            clearInterval(helper)
-                            clearInterval(timer)
-                        }
-                    })
+                        timer = setInterval(refresh, 1000)
+                        helper = setInterval(() => {
+                            if (now.val.split('/')[0] != 'task') {
+                                clearInterval(helper)
+                                clearInterval(timer)
+                            }
+                        }, 1000)
+                    }
+                    _that.restartPolling()
                 })
             },
         })

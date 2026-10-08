@@ -72,3 +72,13 @@ export const deleteTask = async (id: number) => {
     const res = await fetch(`/api/deleteTask?id=${id}`).then(res => res.json()) as ResJSON
     if (!res.success) throw new Error(res.message)
 }
+
+export const retryTask = async (id: number): Promise<TaskStatus> => {
+    const res = await fetch('/api/retryTask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+    }).then(res => res.json()) as ResJSON<TaskStatus>
+    if (!res.success) throw new Error(res.message)
+    return res.data
+}
