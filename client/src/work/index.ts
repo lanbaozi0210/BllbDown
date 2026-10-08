@@ -8,6 +8,8 @@ import { ParseModalComp } from './view/parseModal'
 import InputBox from './view/inputBox'
 import { Modal } from 'bootstrap'
 import { LoadingBox } from '../view'
+import RecentVideos from './view/recentVideos'
+import { addRecentVideo, hasRecentHistory, readRecentHistory, recentVideosFromTasks, writeRecentHistory, RecentVideo } from './history'
 
 const { div } = van.tags
 
@@ -18,6 +20,7 @@ export class WorkRoute {
     /** 仅作为类名字符串 */
     urlInvalidClass = van.derive(() => this.urlInvalid.val ? 'is-invalid' : '')
     urlValue = van.state('')
+    recentVideos = van.state<RecentVideo[]>(readRecentHistory())
     videoInfoCardData = van.state<VideoParseResult>({
         title: '', description: '', cover: '', publishData: '', duration: 0,
         pages: [], owner: { face: '', mid: 0, name: '' },
@@ -51,6 +54,23 @@ export class WorkRoute {
 
     sectionTabsActiveIndex = van.state(0)
 
+    rememberRecent(item: RecentVideo) {
+        this.recentVideos.val = addRecentVideo(this.recentVideos.val, item)
+    }
+
+    async openRecent(item: RecentVideo) {
+        if (this.btnLoading.val) return
+        this.btnLoading.val = true
+        this.urlValue.val = item.idType === 'bv' ? item.value : `${item.idType}${item.value}`
+        try {
+            await start(this, { idType: item.idType, value: item.value, from: 'click' })
+        } catch (error) {
+            alert(`重新解析失败：${error instanceof Error ? error.message : String(error)}`)
+        } finally {
+            this.btnLoading.val = false
+        }
+    }
+
     constructor() {
         const _that = this
         this.allSection = van.derive(() => {
@@ -82,6 +102,7 @@ export class WorkRoute {
                             div({ class: 'welcome-description' }, '支持视频、番剧与收藏夹链接；解析后可选择视频或仅音频 MP3。')
                         ),
                         InputBox(_that),
+                        RecentVideos(_that),
                         div({ hidden: () => _that.videoInfoCardMode.val == 'hide' || _that.btnLoading.val },
                             VideoInfoCard(_that),
                         ),
@@ -90,9 +111,18 @@ export class WorkRoute {
             },
             async onFirst() {
                 if (!await checkLogin()) return
+                if (!hasRecentHistory()) {
+                    recentVideosFromTasks().then(items => {
+                        if (!hasRecentHistory()) {
+                            _that.recentVideos.val = items
+                            writeRecentHistory(items)
+                        }
+                    }).catch(() => {})
+                }
                 let idType = this.args[0] as IDType
                 let value = this.args[1]
                 if (!value) {
+                    _that.videoInfoCardMode.val = 'hide'
                     _that.initLoading.val = false
                     return
                 }
@@ -119,6 +149,10 @@ export class WorkRoute {
             },
             async onLoad() {
                 if (!GLOBAL_HAS_LOGIN.val) return goto('login')
+                if (!this.args[1]) {
+                    _that.videoInfoCardMode.val = 'hide'
+                    _that.urlValue.val = ''
+                }
             }
         })
     }

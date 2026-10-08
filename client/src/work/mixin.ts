@@ -121,6 +121,16 @@ export const start = async (
             workRoute.videoInfoCardMode.val = 'video'
         })
     }
+    if (!workRoute.isInitPopular.val && option.idType !== 'fav') {
+        const info = workRoute.videoInfoCardData.val
+        workRoute.rememberRecent({
+            idType: option.idType,
+            value: String(option.value),
+            title: info.title,
+            cover: info.cover,
+            duration: info.duration,
+        })
+    }
 }
 
 const episodeToPage = (episode: Episode, index: number): PageInParseResult => {

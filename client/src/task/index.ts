@@ -30,7 +30,7 @@ export class TaskRoute implements VanComponent {
         opening: State<boolean>
         /** 是否正在删除 */
         deleting: State<boolean>
-        /** 是否正在发起接力下载 */
+        /** 是否正在发起继续下载 */
         retrying: State<boolean>
     })[]> = van.state([])
 
@@ -87,7 +87,7 @@ export class TaskRoute implements VanComponent {
                                     div({ class: 'text-secondary small' },
                                         () => {
                                             if (task.statusState.val == 'waiting') return '等待下载'
-                                            if (task.statusState.val == 'error') return '下载中断或失败 · 可从这里接力下载'
+                                            if (task.statusState.val == 'error') return '下载中断或失败 · 可从这里继续下载'
                                             if (task.statusState.val == 'done') return `已完成 · ${task.folder}`
                                             if (task.downloadType === 'audio_mp3' && task.audioProgress.val >= 1) return '正在转换 MP3'
                                             if (task.videoProgress.val == 0) {
@@ -140,12 +140,12 @@ export class TaskRoute implements VanComponent {
                                                 task.mergeProgress.val = 0
                                                 _that.restartPolling()
                                             } catch (error) {
-                                                alert(`接力下载失败：${error instanceof Error ? error.message : String(error)}`)
+                                                alert(`继续下载失败：${error instanceof Error ? error.message : String(error)}`)
                                             } finally {
                                                 task.retrying.val = false
                                             }
                                         }
-                                    }, () => task.retrying.val ? '正在准备…' : '接力下载')
+                                    }, () => task.retrying.val ? '正在准备…' : '继续下载')
                                 ),
                                 div({
                                     class: 'me-4',

@@ -8,7 +8,7 @@ export default () => {
     const classStr = (name: string) => van.derive(() => `text-nowrap nav-link ${now.val.split('/')[0] == name ? 'active' : ''}`)
 
     return div({ class: 'app-header' },
-        div({ class: 'brand-lockup' },
+        a({ class: 'brand-lockup', href: '#/work', title: '返回首页', 'aria-label': 'BllbDown，返回首页' },
             img({ class: 'brand-mark', src: '/brand-mark.svg', alt: '' }),
             div({ class: 'brand-copy' },
                 div({ class: 'brand-name' }, 'BllbDown'),
