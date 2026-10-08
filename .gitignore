@@ -6,6 +6,7 @@ static/
 *.exe
 download/
 build/
+bilidown-fixed
 .VSCodeCounter/
 .claude/
 server/bilidown.exe~

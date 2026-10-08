@@ -17,7 +17,7 @@ const { div } = van.tags
 redirect('home', 'work')
 
 van.add(document.body,
-    div({ class: 'container py-4 vstack gap-4', hidden: GLOBAL_HIDE_PAGE },
+    div({ class: 'container py-4 vstack gap-4 app-shell', hidden: GLOBAL_HIDE_PAGE },
         Header(),
         Work(),
         Task(),

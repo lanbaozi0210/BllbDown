@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
 )
@@ -79,6 +80,20 @@ func (client *BiliClient) GetPlayInfo(bvid string, cid int) (*PlayInfo, error) {
 	response, err := client.SimpleGET("https://api.bilibili.com/x/player/playurl", params)
 	if err != nil {
 		return nil, err
+	}
+	// Modified: Bilibili can return an HTML 412 page for an otherwise valid
+	// logged-in playback request. Retry as a guest for public videos only.
+	if response.StatusCode == http.StatusPreconditionFailed && client.SESSDATA != "" {
+		response.Body.Close()
+		guest := &BiliClient{}
+		response, err = guest.SimpleGET("https://api.bilibili.com/x/player/playurl", params)
+		if err != nil {
+			return nil, fmt.Errorf("登录请求被拦截 (HTTP 412)，未登录重试失败: %w", err)
+		}
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("播放地址接口返回 HTTP %d", response.StatusCode)
 	}
 	body := BaseResV2{}
 	err = json.NewDecoder(response.Body).Decode(&body)

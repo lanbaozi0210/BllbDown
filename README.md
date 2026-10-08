@@ -1,136 +1,40 @@
-# Bilidown
+# BllbDown
 
-[![GitHub Release](https://img.shields.io/github/v/release/iuroc/bilidown)](https://github.com/iuroc/bilidown/releases)
+轻量的 Bilibili 视频与音频下载工具。界面采用克制的复古未来主义风格，支持批量解析、视频画质选择、仅音频 MP3、任务进度和本机托盘操作。
 
-哔哩哔哩视频解析下载工具，支持 8K 视频、Hi-Res 音频、杜比视界下载、批量解析，可扫码登录，常驻托盘。
+> 本项目基于 [iuroc/bilidown v2.1.1](https://github.com/iuroc/bilidown) 修改，保留原项目版权和 [Apache-2.0 许可证](LICENSE)。BllbDown 为独立维护的衍生项目，并非原作者的官方版本。
 
-## 支持解析的链接类型
+## 功能
 
--   【单个视频】https://www.bilibili.com/video/BV1LLDCYJEU3/
--   【番剧和影视剧】https://www.bilibili.com/bangumi/play/ss48831
--   【视频合集】https://space.bilibili.com/282565107/channel/collectiondetail?sid=1427135
--   【收藏夹】https://space.bilibili.com/1176277996/favlist?fid=1234122612
--   【UP 主空间地址】等待 3.x 版本支持
+- 解析单个视频、番剧、合集和收藏夹链接。
+- 批量选择最高可用、1080P 或 720P；也可逐条选择 Bilibili 实际提供的画质。目标画质不可用时，自动选择最接近的可用画质。画质不会被本地放大。
+- 选择音视频合并、仅视频、原始 M4A 音频或转码 MP3。MP3 为 192 kbps，并写入歌名、作者等标签。
+- 显示等待、下载、完成和失败状态；失败后可重新解析。
+- 对部分已登录播放地址遇到 HTTP 412 的公开视频请求，尝试匿名重试。会员内容和需要登录权限的资源不保证可用。
 
-## 使用说明
+HEVC、AVC、AV1 是视频编码，不是画质；只有 Bilibili 返回了对应的视频流，才能选择该画质。请尊重版权和平台规则，仅下载有权保存的内容。
 
-1. 从 [Releases](https://github.com/iuroc/bilidown/releases) 下载适合您系统版本的安装包
-2. 非 Windows 系统，请先安装 [FFmpeg 工具](https://www.ffmpeg.org/)
-3. 将安装包解压后执行即可
+## 本地运行
 
-## 软件特色
+需要 Go、Node.js、pnpm 和 FFmpeg。本项目目前主要在 macOS 上验证。前端构建：
 
-1. 前端采用 [Bootstrap](https://github.com/twbs/bootstrap) 和 [VanJS](https://github.com/vanjs-org/van) 构建，轻量美观
-2. 后端使用 Go 语言开发，数据库采用 SQlite，简化构建和部署过程
-3. 前端通过 [p-queue](https://github.com/sindresorhus/p-queue) 控制并发请求，加快批量解析速度
-
-## 其他说明
-
--   本程序不支持也不建议 HTTP 代理，直接使用国内网络访问能提升批量解析的成功率和稳定性。
-
-## 打包可执行文件
-
-```shell
-git clone https://github.com/iuroc/bilidown
-cd bilidown/client
+```sh
+cd client
 pnpm install
 pnpm build
+```
+
+后端构建：
+
+```sh
 cd ../server
-go mod tidy
-CGO_ENABLED=1 go build
+go build -o bilidown .
 ```
 
-## 交叉编译
+将生成的可执行文件、`server/static` 目录和 FFmpeg 放在同一个运行目录，然后运行可执行文件。BllbDown 仅监听本机 `127.0.0.1:8099`，可与监听 8098 的原版并存，但不能同时启动两个使用 8099 的实例。
 
-### 说明
+## 隐私与开源说明
 
--   镜像名称：`iuroc/cgo-cross-build`
--   支持的系统架构
-    -   `linux/amd64`
-    -   `windows/amd64`
-    -   `windows/386`
-    -   `windows/arm64`
-    -   `darwin/amd64`
-    -   `darwin/arm64`
+`data.db`、下载内容、编译产物和个人登录信息不属于开源仓库，已列入忽略规则。不要把包含这些数据的本地成品文件夹直接上传或分享。
 
-### 拉取镜像和项目源码
-
-```shell
-docker pull iuroc/cgo-cross-build:latest
-git clone https://github.com/iuroc/bilidown
-```
-
-### 交叉编译发行版
-
-> 执行 `goreleaser` 命令时将自动执行 `pnpm build` 和 `go mod tidy`
-
-将 `ffmpeg.exe` 放入 `server/bin` 目录内。
-
-在项目根目录执行如下代码，进入 Docker 容器。
-
-```shell
-docker run --rm -it -v .:/usr/src/data iuroc/cgo-cross-build
-```
-
-在容器内的终端执行如下代码，开始交叉编译。
-
-```shell
-cd server
-git tag v2.1.1
-goreleaser release --snapshot --clean
-# 正式发行
-# GITHUB_TOKEN=xxx goreleaser release --clean
-```
-
-### 编译指定系统架构
-
-```ini
-# 按上面的步骤进入 Docker 容器内终端
-
-# [darwin-amd64]
-GOOS=darwin
-GOARCH=amd64
-CC=o64-clang
-CGO_ENABLED=1
-go build
-```
-
-### 非 Docker 环境编译
-
-在 Linux amd64 平台上执行 `go build` 时，您可能需要安装以下依赖包：  
-
-```bash
-sudo apt install pkg-config gcc libayatana-appindicator3-dev
-```
-
-## 开发环境
-
-```bash
-# client
-pnpm install
-pnpm dev
-# server
-go build && ./bilidown
-```
-
-## 特别感谢
-
--   [twbs/bootstrap](https://github.com/twbs/bootstrap) - 前端开发必备的响应式框架，简化页面布局
--   [vanjs-org/van](https://github.com/vanjs-org/van) - 轻量级的前端框架，专注于构建高效应用
--   [vitejs/vite](https://github.com/vitejs/vite) - 快速的前端构建工具，基于 ES 模块开发
--   [SocialSisterYi/bilibili-API-collec](https://github.com/SocialSisterYi/bilibili-API-collect) - B 站 API 集合，支持多种操作接口
--   [sindresorhus/p-queue](https://github.com/sindresorhus/p-queue) - 支持并发限制的 JavaScript 队列处理库
--   [iuroc/vanjs-router](https://github.com/iuroc/vanjs-router) - 轻量级前端路由工具，适用于 Van.js 框架
--   [uuidjs/uuid](https://www.npmjs.com/package/uuid) - 用于生成唯一标识符（UUID）的 JavaScript 库
--   [getlantern/systray](https://github.com/getlantern/systray) - 简单的跨平台系统托盘图标库，支持图标管理
--   [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) - Go 语言的 SQLite3 数据库驱动，轻量高效
--   [skip2/go-qrcode](https://github.com/skip2/go-qrcode) - 生成 QR 码的 Go 语言库，简单易用
-
-## 软件界面
-
-![](./docs/2024-11-05_090604.png)
-
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=iuroc/bilidown&type=Date)](https://www.star-history.com/#iuroc/bilidown&Date)
+项目保留原作者的 [LICENSE](LICENSE)。如需反馈问题或贡献修改，请在本仓库提交 Issue 或 Pull Request。原项目地址：[iuroc/bilidown](https://github.com/iuroc/bilidown)。

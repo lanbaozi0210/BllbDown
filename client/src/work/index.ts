@@ -8,7 +8,6 @@ import { ParseModalComp } from './view/parseModal'
 import InputBox from './view/inputBox'
 import { Modal } from 'bootstrap'
 import { LoadingBox } from '../view'
-import { getPopularVideoBvIds } from './data'
 
 const { div } = van.tags
 
@@ -77,6 +76,11 @@ export class WorkRoute {
                 return div(
                     () => _that.initLoading.val ? LoadingBox() : '',
                     div({ class: 'vstack gap-3', hidden: _that.initLoading },
+                        div({ class: 'welcome-panel' },
+                            div({ class: 'welcome-eyebrow' }, '01 / INPUT'),
+                            div({ class: 'welcome-title' }, '粘贴链接，开始下载'),
+                            div({ class: 'welcome-description' }, '支持视频、番剧与收藏夹链接；解析后可选择视频或仅音频 MP3。')
+                        ),
                         InputBox(_that),
                         div({ hidden: () => _that.videoInfoCardMode.val == 'hide' || _that.btnLoading.val },
                             VideoInfoCard(_that),
@@ -88,12 +92,9 @@ export class WorkRoute {
                 if (!await checkLogin()) return
                 let idType = this.args[0] as IDType
                 let value = this.args[1]
-                // if (!value) return goto('work'), _that.initLoading.val = false
                 if (!value) {
-                    _that.isInitPopular.val = true
-                    const popularBvidList = await getPopularVideoBvIds()
-                    idType = 'bv'
-                    value = popularBvidList[Math.floor(Math.random() * popularBvidList.length)]
+                    _that.initLoading.val = false
+                    return
                 }
                 if (idType == 'bv' && !value.match(/^BV1[a-zA-Z0-9]+$/)) return goto('work')
                 if ((idType == 'ep' || idType == 'ss' || idType == 'fav')

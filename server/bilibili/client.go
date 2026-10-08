@@ -37,7 +37,10 @@ func (client *BiliClient) SimpleGET(_url string, params map[string]string) (*htt
 // MakeHeader 生成请求头
 func (client *BiliClient) MakeHeader() http.Header {
 	header := http.Header{}
-	header.Set("Cookie", "SESSDATA="+client.SESSDATA)
+	// Modified: guest retries must omit Cookie entirely.
+	if client.SESSDATA != "" {
+		header.Set("Cookie", "SESSDATA="+client.SESSDATA)
+	}
 	header.Set("User-Agent", "Mozilla/5.0")
 	header.Set("Referer", "https://www.bilibili.com")
 	return header

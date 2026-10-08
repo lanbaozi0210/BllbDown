@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="BllbDown">
+  <rect x="4" y="4" width="88" height="88" rx="17" fill="#F3F4F0" stroke="#20292F" stroke-width="4"/>
+  <rect x="15" y="16" width="66" height="56" rx="7" fill="#20292F"/>
+  <rect x="21" y="22" width="54" height="44" rx="3" fill="#E8EDF0"/>
+  <path d="M48 30v20m0 0-9-9m9 9 9-9" fill="none" stroke="#276FF1" stroke-width="6" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M36 56h24" stroke="#20292F" stroke-width="4" stroke-linecap="square"/>
+  <rect x="18" y="79" width="35" height="4" rx="1" fill="#20292F"/>
+  <rect x="70" y="77" width="8" height="8" rx="2" fill="#F06B3E"/>
+</svg>

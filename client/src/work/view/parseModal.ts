@@ -32,6 +32,20 @@ const codecMap: Record<12 | 7 | 13, string> = {
     13: "AV1 (av01)",
 }
 
+type QualityPreset = 'best' | '1080' | '720'
+
+const qualityIndex = (formats: VideoFormat[], preset: QualityPreset): number => {
+    if (preset === 'best' || formats.length === 0) return 0
+    const preferred = preset === '1080' ? [80, 116, 112] : [64, 74]
+    for (const format of preferred) {
+        const index = formats.indexOf(format as VideoFormat)
+        if (index >= 0) return index
+    }
+    const limit = preset === '1080' ? 80 : 64
+    const lowerIndex = formats.findIndex(format => format < limit)
+    return lowerIndex >= 0 ? lowerIndex : formats.length - 1
+}
+
 export class ParseModalComp implements VanComponent {
     element: HTMLElement
 
@@ -52,8 +66,11 @@ export class ParseModalComp implements VanComponent {
     /** 该属性用于在点击“开始下载”按钮后使按钮变为禁用状态，防止多次点击 */
     downloadBtnDisabled = van.state(false)
 
-    /** 下载类型：audio 仅音频，video 仅视频，merge 音视频合并 */
-    downloadType = van.state<'audio' | 'video' | 'merge'>('merge')
+    /** 下载类型：audio 保留原音频，audio_mp3 转为 MP3 */
+    downloadType = van.state<'audio' | 'audio_mp3' | 'video' | 'merge'>('merge')
+
+    /** 批量画质预设；单条视频仍可在列表中单独调整 */
+    qualityPreset = van.state<QualityPreset>('best')
 
     /** 优先视频编码格式：12 hev1, 7 avc1, 13 av01 */
     preferredCodec = van.state<12 | 7 | 13>(12)
@@ -117,7 +134,7 @@ export class ParseModalComp implements VanComponent {
                     page,
                     info: playInfo,
                     selected: van.state(true),
-                    formatIndex: van.state(0),
+                    formatIndex: van.state(qualityIndex(playInfo.accept_quality, this.qualityPreset.val)),
                 })
                 this.finishCount.val++
             }).catch(() => {
@@ -129,9 +146,17 @@ export class ParseModalComp implements VanComponent {
         await queue.onIdle()
     }
 
+    selectQuality(preset: QualityPreset) {
+        this.qualityPreset.val = preset
+        this.allPlayInfo.val.forEach(item => {
+            item.formatIndex.val = qualityIndex(item.info!.accept_quality, preset)
+        })
+    }
+
     download() {
         const selectedPlayInfos = this.allPlayInfo.val.filter(info => info.selected.val)
         const workRoute = this.option.workRoute
+        const isAudioDownload = this.downloadType.val === 'audio' || this.downloadType.val === 'audio_mp3'
         this.downloadBtnDisabled.val = true
         // 需要传递给服务器，需要创建下载任务的数据列表
         createTask(selectedPlayInfos.map(info => {
@@ -153,7 +178,7 @@ export class ParseModalComp implements VanComponent {
                         info.page.part.trim(),
                         `[${info.page.badge.trim()}]`,
                         `[${cardTitle.trim()}]`,
-                        `[${videoFormatMap[info.info!.accept_quality[info.formatIndex.val]]}]`,
+                        isAudioDownload ? '' : `[${videoFormatMap[info.info!.accept_quality[info.formatIndex.val]]}]`,
                         `[${formatSeconds(info.info!.dash.duration)}]`
                     ]
                     : [
@@ -161,12 +186,12 @@ export class ParseModalComp implements VanComponent {
                         workRoute.sectionPages.val.length == 1 ? '' : `[${info.page.badge.trim()}]`,
                         info.page.part.trim(),
                         isVideoMode ? `[${owner}]` : '',
-                        `[${videoFormatMap[info.info!.accept_quality[info.formatIndex.val]]}]`,
+                        isAudioDownload ? '' : `[${videoFormatMap[info.info!.accept_quality[info.formatIndex.val]]}]`,
                         `[${formatSeconds(info.info!.dash.duration)}]`
                     ]).filter(p => p).join(' '),
                 format: info.info!.accept_quality[info.formatIndex.val],
                 owner,
-                audio: getAudioURL(info.info!, this.preferHiResAudio.val),
+                audio: getAudioURL(info.info!, this.downloadType.val !== 'audio' && this.preferHiResAudio.val),
                 duration: info.info!.dash.duration,
                 downloadType: this.downloadType.val,
                 ...activeVideoInfo
@@ -216,7 +241,7 @@ export class ParseModalComp implements VanComponent {
                                         info.page.badge) : ''
                                 ),
                             ),
-                            div({ class: 'dropdown' },
+                            div({ class: 'dropdown', hidden: () => _that.downloadType.val === 'audio' || _that.downloadType.val === 'audio_mp3' },
                                 div({ class: 'dropdown-toggle py-2 text-primary', 'data-bs-toggle': 'dropdown' },
                                     () => videoFormatMap[info.info!.accept_quality[info.formatIndex.val]]
                                 ),
@@ -256,22 +281,38 @@ export class ParseModalComp implements VanComponent {
                     select({
                         class: 'form-select form-select-sm',
                         value: _that.downloadType,
-                        oninput: (e) => _that.downloadType.val = (e.target as HTMLSelectElement).value as 'audio' | 'video' | 'merge'
+                        oninput: (e) => _that.downloadType.val = (e.target as HTMLSelectElement).value as 'audio' | 'audio_mp3' | 'video' | 'merge'
                     },
                         option({ value: 'merge' }, '音视频合并'),
-                        option({ value: 'audio' }, '仅音频'),
+                        option({ value: 'audio' }, '仅音频（M4A）'),
+                        option({ value: 'audio_mp3' }, '仅音频（MP3）'),
                         option({ value: 'video' }, '仅视频')
                     ),
-                    select({
-                        class: 'form-select form-select-sm',
-                        value: _that.preferredCodec,
-                        oninput: (e) => _that.preferredCodec.val = Number((e.target as HTMLSelectElement).value) as 12 | 7 | 13
-                    },
-                        option({ value: '12' }, 'HEVC (hev1)'),
-                        option({ value: '7' }, 'AVC (avc1)'),
-                        option({ value: '13' }, 'AV1 (av01)')
+                    div({ hidden: () => _that.downloadType.val === 'audio' || _that.downloadType.val === 'audio_mp3' },
+                        select({
+                            class: 'form-select form-select-sm',
+                            'aria-label': '批量选择视频画质',
+                            value: _that.qualityPreset,
+                            oninput: (e) => _that.selectQuality((e.target as HTMLSelectElement).value as QualityPreset)
+                        },
+                            option({ value: 'best' }, '画质：最高可用'),
+                            option({ value: '1080' }, '画质：1080P'),
+                            option({ value: '720' }, '画质：720P')
+                        )
                     ),
-                    div({ class: 'form-check form-check-inline' },
+                    div({ hidden: () => _that.downloadType.val === 'audio' || _that.downloadType.val === 'audio_mp3' },
+                        select({
+                            class: 'form-select form-select-sm',
+                            'aria-label': '优先视频编码',
+                            value: _that.preferredCodec,
+                            oninput: (e) => _that.preferredCodec.val = Number((e.target as HTMLSelectElement).value) as 12 | 7 | 13
+                        },
+                            option({ value: '12' }, 'HEVC (hev1)'),
+                            option({ value: '7' }, 'AVC (avc1)'),
+                            option({ value: '13' }, 'AV1 (av01)')
+                        )
+                    ),
+                    div({ class: 'form-check form-check-inline', hidden: () => _that.downloadType.val === 'audio' || _that.downloadType.val === 'video' },
                         input({
                             type: 'checkbox',
                             class: 'form-check-input',
@@ -279,9 +320,14 @@ export class ParseModalComp implements VanComponent {
                             checked: _that.preferHiResAudio,
                             oninput: (e) => _that.preferHiResAudio.val = (e.target as HTMLInputElement).checked
                         }),
-                        label({ class: 'form-check-label', for: 'preferHiResAudio' }, 'Hi-Res')
+                        label({ class: 'form-check-label', for: 'preferHiResAudio' },
+                            () => _that.downloadType.val === 'audio_mp3' ? '优先无损音源（输出仍为 MP3）' : 'Hi-Res')
                     )
-                )
+                ),
+                div({
+                    class: 'quality-hint',
+                    hidden: () => _that.qualityPreset.val === 'best' || _that.downloadType.val === 'audio' || _that.downloadType.val === 'audio_mp3'
+                }, '部分视频没有目标画质时，会选最接近的可用画质；也可在每条视频右侧单独调整。')
             ),
             button({
                 class: `btn btn-secondary`,

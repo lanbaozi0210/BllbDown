@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	HTTP_PORT = 8098      // 限定 HTTP 服务器端口
-	HTTP_HOST = ""        // 限定 HTTP 服务器主机
-	VERSION   = "v2.1.1" // 软件版本号，将影响托盘标题显示
+	HTTP_PORT = 8099              // 定制版独立端口，可与原版同时运行
+	HTTP_HOST = "127.0.0.1"       // 定制版仅供本机访问
+	VERSION   = "v2.1.1-bllbdown" // 定制版标识
 )
 
 var urlLocal = fmt.Sprintf("http://127.0.0.1:%d", HTTP_PORT)
@@ -115,7 +115,7 @@ func mustReadFile(path string) []byte {
 
 // setTitle 设置托盘标题和工具提示
 func setTitle() {
-	title := "Bilidown"
+	title := "BllbDown"
 	tooltip := fmt.Sprintf("%s 视频解析器 %s (port:%d)", title, VERSION, HTTP_PORT)
 	// only available on Mac and Windows.
 	systray.SetTooltip(tooltip)
@@ -137,7 +137,7 @@ func setMenuItem() {
 	go func() {
 		for {
 			<-aboutItem.ClickedCh
-			openBrowser("https://github.com/iuroc/bilidown")
+			openBrowser("https://github.com/lanbaozi0210/BllbDown")
 		}
 	}()
 
@@ -145,7 +145,7 @@ func setMenuItem() {
 	exitItem := systray.AddMenuItem(exitItemText, exitItemText)
 	go func() {
 		<-exitItem.ClickedCh
-		log.Printf("Bilidown has exited.")
+		log.Printf("BllbDown has exited.")
 		systray.Quit()
 	}()
 }

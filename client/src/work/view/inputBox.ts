@@ -13,10 +13,10 @@ class InputBoxComp implements VanComponent {
 
     constructor(public workRoute: WorkRoute) {
         this.element = div(
-            div({ class: () => `hstack gap-3 align-items-stretch ${workRoute.urlInvalidClass.val}` },
+            div({ class: () => `hstack gap-2 align-items-stretch download-input-row ${workRoute.urlInvalidClass.val}` },
                 div({ class: () => `form-floating flex-fill` },
                     input({
-                        class: () => `form-control border-3 ${workRoute.urlInvalidClass.val}`,
+                        class: () => `form-control ${workRoute.urlInvalidClass.val}`,
                         placeholder: '请输入待解析的视频链接',
                         value: workRoute.urlValue,
                         oninput: event => workRoute.urlValue.val = event.target.value,
@@ -24,7 +24,7 @@ class InputBoxComp implements VanComponent {
                             if (event.key === 'Enter') document.getElementById(this.btnID)?.click()
                         }
                     }),
-                    label({ class: 'w-100' }, '请输入视频链接或 BV/EP/SS 号')
+                    label({ class: 'w-100' }, '视频链接或 BV / EP / SS 号')
                 ),
                 ParseButton(this, false, this.btnID),
                 ParseButton(this, true)
@@ -78,7 +78,7 @@ const ParseButton = (parent: InputBoxComp, large: boolean, id: string = '') => {
         id,
         disabled: workRoute.btnLoading
     }, span({ class: 'spinner-border spinner-border-sm me-2', hidden: () => !workRoute.btnLoading.val }),
-        () => workRoute.btnLoading.val ? '解析中' : '解析视频'
+        () => workRoute.btnLoading.val ? '解析中' : '解析链接'
     )
 }
 

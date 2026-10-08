@@ -50,6 +50,8 @@ func (task *TaskInDB) FilePath() string {
 	ext := ".mp4"
 	if task.DownloadType == "audio" {
 		ext = ".m4a"
+	} else if task.DownloadType == "audio_mp3" {
+		ext = ".mp3"
 	}
 	return filepath.Join(task.Folder,
 		fmt.Sprintf("%s %s%s", task.Title,
@@ -119,7 +121,7 @@ func (task *Task) Start() {
 	GlobalDownloadSem.Acquire()
 	task.UpdateStatus(db, "running")
 
-	if task.DownloadType == "audio" {
+	if task.DownloadType == "audio" || task.DownloadType == "audio_mp3" {
 		// 仅音频模式：只下载音频，重命名音频文件为输出文件
 		err = DownloadMedia(client, task.Audio, task, "audio")
 		if err != nil {
@@ -130,6 +132,17 @@ func (task *Task) Start() {
 		GlobalDownloadSem.Release()
 		outputPath := task.TaskInDB.FilePath()
 		audioPath := filepath.Join(task.Folder, strconv.FormatInt(task.ID, 10)+".audio")
+		if task.DownloadType == "audio_mp3" {
+			if err := task.convertToMP3(audioPath, outputPath); err != nil {
+				task.UpdateStatus(db, "error", fmt.Errorf("convertToMP3: %v", err))
+				return
+			}
+			if err := os.Remove(audioPath); err != nil {
+				log.Printf("清理已转换音频失败 (任务ID: %d): %v", task.ID, err)
+			}
+			task.UpdateStatus(db, "done")
+			return
+		}
 		err = os.Rename(audioPath, outputPath)
 		if err != nil {
 			task.UpdateStatus(db, "error", fmt.Errorf("os.Rename: %v", err))
@@ -208,6 +221,29 @@ func (task *Task) Start() {
 		}
 		task.UpdateStatus(db, "done")
 	}
+}
+
+// convertToMP3 转码并写入常见 MP3 播放器可识别的 ID3 元数据。
+func (task *Task) convertToMP3(inputPath, outputPath string) error {
+	ffmpegPath, err := util.GetFFmpegPath()
+	if err != nil {
+		return err
+	}
+	tempPath := outputPath + ".tmp.mp3"
+	defer os.Remove(tempPath)
+	cmd := exec.Command(ffmpegPath,
+		"-nostdin", "-hide_banner", "-loglevel", "error",
+		"-i", inputPath, "-vn", "-codec:a", "libmp3lame", "-b:a", "192k",
+		"-id3v2_version", "3",
+		"-metadata", "title="+task.Title,
+		"-metadata", "artist="+task.Owner,
+		"-metadata", "description="+task.Bvid,
+		"-y", tempPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("ffmpeg 转码失败: %w: %s", err, string(output))
+	}
+	return os.Rename(tempPath, outputPath)
 }
 
 // 合并音视频
@@ -306,11 +342,14 @@ func (task *Task) UpdateStatus(db *sql.DB, status TaskStatus, errs ...error) err
 	return err
 }
 
-func DownloadMedia(client *bilibili.BiliClient, _url string, task *Task, mediaType string) error {
+func DownloadMedia(_ *bilibili.BiliClient, _url string, task *Task, mediaType string) error {
 	var resp *http.Response
 	var err error
+	// Modified: signed media URLs for public videos work without account cookies.
+	// Do not forward SESSDATA to the media CDN.
+	guest := &bilibili.BiliClient{}
 	for i := 0; i < 5; i++ {
-		resp, err = client.SimpleGET(_url, nil)
+		resp, err = guest.SimpleGET(_url, nil)
 		if err == nil {
 			break
 		}
@@ -318,6 +357,10 @@ func DownloadMedia(client *bilibili.BiliClient, _url string, task *Task, mediaTy
 
 	if err != nil {
 		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
+		return fmt.Errorf("媒体下载接口返回 HTTP %d", resp.StatusCode)
 	}
 
 	filename := strconv.FormatInt(task.ID, 10) + "." + mediaType
