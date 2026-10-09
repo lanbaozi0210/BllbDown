@@ -1,4 +1,4 @@
-import { getFavList, getRedirectedLocation, getSeasonInfo, getVideoInfo } from './data'
+import { getFavList, getRedirectedLocation, getSeasonInfo, getVideoInfo, getYTDLPInfo } from './data'
 import { WorkRoute } from '.'
 import van from 'vanjs-core'
 import { Episode, PageInParseResult, VideoParseResult } from './type'
@@ -21,7 +21,17 @@ export const start = async (
     if (!workRoute.isInitPopular.val)
         history.replaceState(null, '', `#/work/${option.idType}/${option.value}`)
     workRoute.sectionTabsActiveIndex.val = 0
-    if (option.idType === 'bv') {
+    if (option.idType === 'yt') {
+        const info = await getYTDLPInfo(String(option.value))
+        const bvid = info.id
+        workRoute.videoInfoCardData.val = {
+            section: [], targetURL: info.url || String(option.value), areas: [], styles: [], status: '',
+            cover: info.thumbnail, title: info.title, description: info.description || '', publishData: info.uploadDate || '', duration: info.duration,
+            pages: [{ bvid, cid: 0, page: 1, part: info.title, duration: info.duration, dimension: { width: info.width, height: info.height, rotate: 0 }, badge: '1', selected: van.state(true), sourceURL: String(option.value) }],
+            dimension: { width: info.width, height: info.height, rotate: 0 }, owner: { mid: 0, name: info.uploader, face: '' }, staff: []
+        }
+        workRoute.videoInfoCardMode.val = 'video'
+    } else if (option.idType === 'bv') {
         const bvid = option.value as string
         await getVideoInfo(bvid).then(info => {
             workRoute.videoInfoCardData.val = {
@@ -146,7 +156,7 @@ const episodeToPage = (episode: Episode, index: number): PageInParseResult => {
     }
 }
 
-export type IDType = 'bv' | 'ep' | 'ss' | 'fav'
+export type IDType = 'bv' | 'ep' | 'ss' | 'fav' | 'yt'
 
 /**
  * 校验用户输入的待解析的视频链接
@@ -159,6 +169,13 @@ export const checkURL = (url: string): {
 } => {
     const matchBvid = url.match(/^(?:https?:\/\/www\.bilibili\.com\/video\/)?(BV1[a-zA-Z0-9]+)/)
     if (matchBvid) return { type: 'bv', value: matchBvid[1] }
+    try {
+        const parsed = new URL(url)
+        const host = parsed.hostname.toLowerCase()
+        if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be' ||
+            (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !host.endsWith('bilibili.com') && host !== 'b23.tv')
+            return { type: 'yt', value: url }
+    } catch { }
 
     const matchSeason = url.match(/^(?:https?:\/\/www\.bilibili\.com\/bangumi\/play\/)?(ep|ss)(\d+)/)
     if (matchSeason) return { type: matchSeason[1] as 'ep' | 'ss', value: parseInt(matchSeason[2]) }

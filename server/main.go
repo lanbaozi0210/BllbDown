@@ -29,6 +29,12 @@ var urlLocalUnix = fmt.Sprintf("%s?___%d", urlLocal, time.Now().UnixMilli())
 
 func main() {
 	checkFFmpeg()
+	// 在无图形界面的开发/服务器环境中跳过系统托盘初始化，直接启动 HTTP 服务。
+	// 默认行为仍保持桌面托盘模式。
+	if os.Getenv("BLLBDOWN_NO_TRAY") == "1" {
+		onReady()
+		return
+	}
 	// 启动托盘程序
 	systray.Run(onReady, nil)
 }

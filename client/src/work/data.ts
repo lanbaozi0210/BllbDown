@@ -1,5 +1,11 @@
 import { ResJSON, timeoutController } from '../mixin'
-import { FavList, PlayInfo, SeasonInfo, TaskInitData, VideoInfo } from './type'
+import { FavList, PlayInfo, SeasonInfo, TaskInitData, VideoInfo, YTDLPInfo } from './type'
+
+export const getYTDLPInfo = async (url: string): Promise<YTDLPInfo> => {
+    const res = await fetch(`/api/getYTDLPInfo?url=${encodeURIComponent(url)}`).then(res => res.json()) as ResJSON<YTDLPInfo>
+    if (!res.success) throw new Error(res.message)
+    return res.data
+}
 
 /**
  * 获取视频信息

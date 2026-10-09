@@ -87,6 +87,12 @@ export type PageInParseResult = {
     badge: string
     /** 是否选中 */
     selected: State<boolean>
+    sourceURL?: string
+}
+
+export type YTDLPInfo = {
+    id: string; url: string; title: string; description: string; uploader: string; thumbnail: string
+    duration: number; width: number; height: number; uploadDate: string; video: string; audio: string
 }
 
 export type StaffItem = {

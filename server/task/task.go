@@ -126,12 +126,19 @@ func (task *Task) Start() {
 	registerTask(task)
 	db := util.MustGetDB()
 	defer db.Close()
-	sessdata, err := bilibili.GetSessdata(db)
-	if err != nil {
-		task.UpdateStatus(db, "error", fmt.Errorf("bilibili.GetSessdata: %v", err))
-		return
+	var client *bilibili.BiliClient
+	var err error
+	if strings.HasPrefix(task.Bvid, "YT:") {
+		// yt-dlp URLs are already authorized by yt-dlp; no Bilibili login is needed.
+		client = &bilibili.BiliClient{}
+	} else {
+		sessdata, err := bilibili.GetSessdata(db)
+		if err != nil {
+			task.UpdateStatus(db, "error", fmt.Errorf("bilibili.GetSessdata: %v", err))
+			return
+		}
+		client = &bilibili.BiliClient{SESSDATA: sessdata}
 	}
-	client := &bilibili.BiliClient{SESSDATA: sessdata}
 
 	GlobalDownloadSem.Acquire()
 	task.UpdateStatus(db, "running")

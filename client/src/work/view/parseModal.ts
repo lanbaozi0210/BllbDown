@@ -2,7 +2,7 @@ import van, { State } from 'vanjs-core'
 import { VanComponent, formatSeconds } from '../../mixin'
 import { PageInParseResult, PlayInfo, VideoFormat } from '../type'
 import { WorkRoute } from '..'
-import { createTask, getPlayInfo } from '../data'
+import { createTask, getPlayInfo, getYTDLPInfo } from '../data'
 import PQueue from 'p-queue'
 
 const { a, button, div, input, select, option, label } = van.tags
@@ -128,7 +128,12 @@ export class ParseModalComp implements VanComponent {
                 if (this.totalCount.val == this.finishCount.val) return
                 const controller = new AbortController()
                 this.abortControllers.push(controller)
-                const playInfo = await getPlayInfo(page.bvid, page.cid, controller)
+                let playInfo: PlayInfo
+                if (page.sourceURL) {
+                    const yt = await getYTDLPInfo(page.sourceURL)
+                    const media = (url: string, video: boolean): any => ({ id: 80, baseUrl: url, backupUrl: [], bandwidth: 0, mimeType: video ? 'video/mp4' : 'audio/mp4', codecs: video ? 'avc1' : 'mp4a', width: video ? yt.width : 0, height: video ? yt.height : 0, frameRate: '', codecid: 7 })
+                    playInfo = { accept_quality: [80], dash: { duration: yt.duration, video: yt.video ? [media(yt.video, true)] : [], audio: yt.audio ? [media(yt.audio, false)] : [], flac: null } }
+                } else playInfo = await getPlayInfo(page.bvid, page.cid, controller)
                 playInfo.accept_quality = [...new Set(playInfo.dash.video.map(video => video.id))].sort((a, b) => b - a)
                 this.allPlayInfo.val = this.allPlayInfo.val.concat({
                     page,

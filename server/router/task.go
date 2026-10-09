@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"bilidown/task"
 	"bilidown/util"
@@ -29,7 +30,7 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 	db := util.MustGetDB()
 	defer db.Close()
 	for _, item := range body {
-		if !util.CheckBvidFormat(item.Bvid) {
+		if !util.CheckBvidFormat(item.Bvid) && !strings.HasPrefix(item.Bvid, "YT:") {
 			util.Res{Success: false, Message: "bvid 格式错误"}.Write(w)
 			return
 		}
@@ -41,11 +42,11 @@ func createTask(w http.ResponseWriter, r *http.Request) {
 			util.Res{Success: false, Message: "封面链接格式错误"}.Write(w)
 			return
 		}
-		if !util.IsValidURL(item.Audio) {
+		if item.Audio == "" || !util.IsValidURL(item.Audio) {
 			util.Res{Success: false, Message: "音频链接格式错误"}.Write(w)
 			return
 		}
-		if !util.IsValidURL(item.Video) {
+		if item.Video == "" || !util.IsValidURL(item.Video) {
 			util.Res{Success: false, Message: "视频链接格式错误"}.Write(w)
 			return
 		}

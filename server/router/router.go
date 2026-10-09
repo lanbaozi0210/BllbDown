@@ -33,6 +33,7 @@ func API() *http.ServeMux {
 	router.HandleFunc("/downloadVideo", downloadVideo)
 	router.HandleFunc("/getSeasonsArchivesListFirstBvid", getSeasonsArchivesListFirstBvid)
 	router.HandleFunc("/getFavList", getFavList)
+	router.HandleFunc("/getYTDLPInfo", getYTDLPInfo)
 	return router
 }
 

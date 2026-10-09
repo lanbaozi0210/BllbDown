@@ -10,3 +10,8 @@ bilidown-fixed
 .VSCodeCounter/
 .claude/
 server/bilidown.exe~
+.tools/
+.gocache/
+bin/
+server/bin/
+server/bilidown
