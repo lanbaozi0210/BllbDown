@@ -52,8 +52,26 @@ func getYTDLPInfo(w http.ResponseWriter, r *http.Request) {
 		util.Res{Success: false, Message: "yt-dlp 返回数据无效"}.Write(w)
 		return
 	}
+	// Prefer ordinary HTTPS media URLs. The first entry in formats is often an
+	// HLS manifest, which cannot be downloaded by the Range-based downloader.
+	var directVideo, directAudio string
+	if direct, err := exec.Command(bin, "--no-warnings", "--no-playlist", "-f", "bestvideo[protocol=https]+bestaudio[protocol=https]/best[protocol=https]", "--get-url", url).Output(); err == nil {
+		lines := strings.Fields(string(direct))
+		if len(lines) > 0 {
+			directVideo = lines[0]
+			if len(lines) > 1 {
+				directAudio = lines[1]
+			}
+		}
+	}
 	var video, audio string
+	if directVideo != "" {
+		video, audio = directVideo, directAudio
+	}
 	for _, f := range raw.Formats {
+		if video != "" && audio != "" {
+			break
+		}
 		if video == "" && f.URL != "" && f.Vcodec != "none" && f.Height > 0 {
 			video = f.URL
 		}
