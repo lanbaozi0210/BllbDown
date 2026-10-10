@@ -70,6 +70,10 @@ type Task struct {
 	AudioProgress float64 `json:"audioProgress"`
 	VideoProgress float64 `json:"videoProgress"`
 	MergeProgress float64 `json:"mergeProgress"`
+	AudioBytes    int64   `json:"audioBytes"`
+	AudioTotal    int64   `json:"audioTotal"`
+	VideoBytes    int64   `json:"videoBytes"`
+	VideoTotal    int64   `json:"videoTotal"`
 }
 
 var GlobalTaskList = []*Task{}
@@ -489,7 +493,7 @@ func DownloadMedia(_ *bilibili.BiliClient, _url string, task *Task, mediaType st
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusRequestedRangeNotSatisfiable && existingSize > 0 {
 		if resp.Header.Get("Content-Range") == fmt.Sprintf("bytes */%d", existingSize) {
-			setMediaProgress(task, mediaType, 1)
+			setMediaProgress(task, mediaType, 1, existingSize, existingSize)
 			return nil
 		}
 		return fmt.Errorf("服务器拒绝续传，现有临时文件大小为 %d 字节", existingSize)
@@ -520,7 +524,7 @@ func DownloadMedia(_ *bilibili.BiliClient, _url string, task *Task, mediaType st
 	}
 	defer file.Close()
 	progress := &progressBar{total: total, current: existingSize}
-	setMediaProgress(task, mediaType, progress.percent())
+	setMediaProgress(task, mediaType, progress.percent(), progress.current, total)
 	buf := make([]byte, 64*1024)
 	var copied int64
 	for {
@@ -535,7 +539,7 @@ func DownloadMedia(_ *bilibili.BiliClient, _url string, task *Task, mediaType st
 			}
 			copied += int64(n)
 			progress.add(n)
-			setMediaProgress(task, mediaType, progress.percent())
+			setMediaProgress(task, mediaType, progress.percent(), progress.current, total)
 		}
 		if readErr == io.EOF {
 			break
@@ -553,7 +557,7 @@ func DownloadMedia(_ *bilibili.BiliClient, _url string, task *Task, mediaType st
 	if err := file.Sync(); err != nil {
 		return err
 	}
-	setMediaProgress(task, mediaType, 1)
+	setMediaProgress(task, mediaType, 1, progress.current, total)
 	return nil
 }
 
@@ -563,7 +567,8 @@ func requestMedia(client *http.Client, guest *bilibili.BiliClient, mediaURL stri
 		return nil, err
 	}
 	req.Header = guest.MakeHeader()
-	if start > 0 || end >= 0 {
+	// 即使从头开始也请求 Range，让 CDN 尽量返回 Content-Range 和总大小。
+	if start >= 0 || end >= 0 {
 		if end >= 0 {
 			req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 		} else {
@@ -619,12 +624,16 @@ func parseContentRange(header string) (int64, int64, error) {
 	return start, total, err
 }
 
-func setMediaProgress(task *Task, mediaType string, value float64) {
+func setMediaProgress(task *Task, mediaType string, value float64, current, total int64) {
 	GlobalTaskMux.Lock()
 	if mediaType == "video" {
 		task.VideoProgress = value
+		task.VideoBytes = current
+		task.VideoTotal = total
 	} else {
 		task.AudioProgress = value
+		task.AudioBytes = current
+		task.AudioTotal = total
 	}
 	GlobalTaskMux.Unlock()
 }

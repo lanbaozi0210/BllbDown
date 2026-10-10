@@ -8,6 +8,13 @@ import { PlayerModalComp } from './playerModal'
 
 const { button, div, span } = van.tags
 
+const formatBytes = (bytes: number) => {
+    if (!bytes || bytes < 0) return '0 B'
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
+
 const { svg, path } = van.tags('http://www.w3.org/2000/svg')
 
 export class TaskRoute implements VanComponent {
@@ -32,6 +39,10 @@ export class TaskRoute implements VanComponent {
         deleting: State<boolean>
         /** 是否正在发起继续下载 */
         retrying: State<boolean>
+        audioBytes: State<number>
+        audioTotal: State<number>
+        videoBytes: State<number>
+        videoTotal: State<number>
     })[]> = van.state([])
 
     restartPolling: () => void = () => {}
@@ -91,9 +102,13 @@ export class TaskRoute implements VanComponent {
                                             if (task.statusState.val == 'done') return `已完成 · ${task.folder}`
                                             if (task.downloadType === 'audio_mp3' && task.audioProgress.val >= 1) return '正在转换 MP3'
                                             if (task.videoProgress.val == 0) {
-                                                return `正在下载音频 (${(task.audioProgress.val * 100).toFixed(2)}%)`
+                                                return task.audioTotal.val > 0
+                                                    ? `正在下载音频 (${(task.audioProgress.val * 100).toFixed(2)}%)`
+                                                    : `正在下载音频（已下载 ${formatBytes(task.audioBytes.val)}）`
                                             } else if (task.mergeProgress.val == 0) {
-                                                return `正在下载视频 (${(task.videoProgress.val * 100).toFixed(2)}%)`
+                                                return task.videoTotal.val > 0
+                                                    ? `正在下载视频 (${(task.videoProgress.val * 100).toFixed(2)}%)`
+                                                    : `正在下载视频（已下载 ${formatBytes(task.videoBytes.val)}）`
                                             } else if (task.statusState.val == 'running') {
                                                 return `正在合并音视频 (${(task.mergeProgress.val * 100).toFixed(2)}%)`
                                             } else {
@@ -114,8 +129,8 @@ export class TaskRoute implements VanComponent {
                                             })()}`,
                                             style: () => {
                                                 let width = 0
-                                                if (task.videoProgress.val == 0) width = task.audioProgress.val * 100
-                                                else if (task.mergeProgress.val == 0) width = task.videoProgress.val * 100
+                                                if (task.videoProgress.val == 0) width = task.audioTotal.val > 0 ? task.audioProgress.val * 100 : 36
+                                                else if (task.mergeProgress.val == 0) width = task.videoTotal.val > 0 ? task.videoProgress.val * 100 : 36
                                                 else width = task.mergeProgress.val * 100
                                                 return `width: ${width}%`
                                             }
@@ -138,6 +153,10 @@ export class TaskRoute implements VanComponent {
                                                 task.audioProgress.val = 0
                                                 task.videoProgress.val = 0
                                                 task.mergeProgress.val = 0
+                                                task.audioBytes.val = 0
+                                                task.audioTotal.val = 0
+                                                task.videoBytes.val = 0
+                                                task.videoTotal.val = 0
                                                 _that.restartPolling()
                                             } catch (error) {
                                                 alert(`继续下载失败：${error instanceof Error ? error.message : String(error)}`)
@@ -209,7 +228,11 @@ export class TaskRoute implements VanComponent {
                         statusState: van.state(task.status),
                         opening: van.state(false),
                         deleting: van.state(false),
-                        retrying: van.state(false)
+                        retrying: van.state(false),
+                        audioBytes: van.state(0),
+                        audioTotal: van.state(0),
+                        videoBytes: van.state(0),
+                        videoTotal: van.state(0),
                     }))
 
                     const refresh = async () => {
@@ -225,6 +248,10 @@ export class TaskRoute implements VanComponent {
                                     taskInDB.audioProgress.val = task.audioProgress
                                     taskInDB.videoProgress.val = task.videoProgress
                                     taskInDB.mergeProgress.val = task.mergeProgress
+                                    taskInDB.audioBytes.val = task.audioBytes || 0
+                                    taskInDB.audioTotal.val = task.audioTotal || 0
+                                    taskInDB.videoBytes.val = task.videoBytes || 0
+                                    taskInDB.videoTotal.val = task.videoTotal || 0
                                     taskInDB.statusState.val = task.status
                                 }
                             })

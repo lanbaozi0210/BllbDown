@@ -23,7 +23,10 @@ func getYTDLPInfo(w http.ResponseWriter, r *http.Request) {
 	if _, err := exec.LookPath(bin); err != nil {
 		bin = filepath.Join("bin", "yt-dlp")
 	}
-	out, err := exec.Command(bin, "--no-warnings", "--skip-download", "--playlist-end", "1", "-J", url).Output()
+	// 一次调用同时完成元数据和直链选择。之前先 -J 再 --get-url，会让 YouTube
+	// 被提取两遍，尤其是需要网页挑战的地址会明显变慢。
+	out, err := exec.Command(bin, "--no-warnings", "--no-playlist", "--skip-download",
+		"-f", "bestvideo[protocol=https]+bestaudio[protocol=https]/best[protocol=https]", "-J", url).Output()
 	if err != nil {
 		util.Res{Success: false, Message: fmt.Sprintf("yt-dlp 解析失败: %v", err)}.Write(w)
 		return
@@ -47,21 +50,27 @@ func getYTDLPInfo(w http.ResponseWriter, r *http.Request) {
 			Width    int    `json:"width"`
 			Height   int    `json:"height"`
 		} `json:"formats"`
+		RequestedFormats []struct {
+			URL    string `json:"url"`
+			Vcodec string `json:"vcodec"`
+			Acodec string `json:"acodec"`
+			Width  int    `json:"width"`
+			Height int    `json:"height"`
+		} `json:"requested_formats"`
 	}
 	if err := json.Unmarshal(out, &raw); err != nil || raw.ID == "" {
 		util.Res{Success: false, Message: "yt-dlp 返回数据无效"}.Write(w)
 		return
 	}
-	// Prefer ordinary HTTPS media URLs. The first entry in formats is often an
-	// HLS manifest, which cannot be downloaded by the Range-based downloader.
+	// 优先使用本次 -J 已选出的直链。requested_formats 通常包含独立的视频流
+	// 和音频流，适合本地的 Range 下载器。
 	var directVideo, directAudio string
-	if direct, err := exec.Command(bin, "--no-warnings", "--no-playlist", "-f", "bestvideo[protocol=https]+bestaudio[protocol=https]/best[protocol=https]", "--get-url", url).Output(); err == nil {
-		lines := strings.Fields(string(direct))
-		if len(lines) > 0 {
-			directVideo = lines[0]
-			if len(lines) > 1 {
-				directAudio = lines[1]
-			}
+	for _, f := range raw.RequestedFormats {
+		if directVideo == "" && f.URL != "" && f.Vcodec != "none" {
+			directVideo = f.URL
+		}
+		if directAudio == "" && f.URL != "" && f.Acodec != "none" && f.Vcodec == "none" {
+			directAudio = f.URL
 		}
 	}
 	var video, audio string

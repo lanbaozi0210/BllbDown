@@ -64,6 +64,10 @@ type ActiveTask = {
     videoProgress: number
     /** 音视频合并进度 */
     mergeProgress: number
+    audioBytes: number
+    audioTotal: number
+    videoBytes: number
+    videoTotal: number
     /** 视频时长，秒 */
     duration: number
 }
